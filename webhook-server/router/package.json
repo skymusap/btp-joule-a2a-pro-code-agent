@@ -1,12 +1,12 @@
 {
-    "name": "webhook-cap-router",
+    "name": "astemo-poc-webhook-cap-router",
     "private": true,
     "description": "SAP Approuter for CAP + React SSE app",
     "dependencies": {
-        "@sap/approuter": "^20.8.4"
+        "@sap/approuter": "^22.0.3"
     },
     "engines": {
-        "node": "^20.x"
+        "node": "^22.x"
     },
     "scripts": {
         "start": "node node_modules/@sap/approuter/approuter.js",

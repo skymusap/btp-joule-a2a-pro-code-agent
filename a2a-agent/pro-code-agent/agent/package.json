@@ -36,7 +36,7 @@
     "scripts": {
         "start": "cds-serve",
         "watch": "cds-tsx watch --profile hybrid",
-        "deploy": "mbt build && cf deploy mta_archives/code-based-agent_1.0.0.mtar",
+        "deploy": "mbt build && cf deploy mta_archives/astemo-poc-code-based-agent_1.0.0.mtar",
         "postinstall": "npx patch-package"
     },
     "imports": {

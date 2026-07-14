@@ -85,14 +85,6 @@ const agentCard: AgentCard = {
 const extendedAgentCard: AgentCard = {
     ...agentCard,
     capabilities: {
-        ...agentCard.capabilities,
-        extensions: [
-            {
-                uri: "https://github.com/SAP-samples/btp-joule-a2a-pro-code-agent/a2a-agent/extensions/mock-response/v1",
-                description: "Returns mocked responses when activated via transport header.",
-                required: false,
-                params: { mode: "opt-in" }
-            }
-        ]
+        ...agentCard.capabilities
     }
 };

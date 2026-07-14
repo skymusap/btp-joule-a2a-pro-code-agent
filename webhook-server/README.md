@@ -216,8 +216,8 @@ cf deploy mta_archives/webhook-server_1.0.0.mtar
 After deployment, configure the webhook authentication via environment variables:
 
 ```bash
-cf set-env webhook-cap-srv WEBHOOK_BEARER_TOKEN your-production-token
-cf restage webhook-cap-srv
+cf set-env astemo-poc-webhook-cap-srv WEBHOOK_BEARER_TOKEN your-production-token
+cf restage astemo-poc-webhook-cap-srv
 ```
 
 ## 9) Route Configuration

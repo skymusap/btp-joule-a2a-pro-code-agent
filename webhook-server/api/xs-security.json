@@ -1,5 +1,5 @@
 {
-  "xsappname": "webhook-cap-server",
+  "xsappname": "astemo-poc-webhook-cap-server",
   "tenant-mode": "dedicated",
   "description": "Minimal XSUAA configuration for CAP service authentication",
   "oauth2-configuration": {

@@ -43,7 +43,7 @@ export class LangGraphAgentExecutor implements AgentExecutor {
         const model = new OrchestrationClient({
             promptTemplating: {
                 model: {
-                    name: "gpt-4.1"
+                    name: "gpt-5.4"
                 }
             }
         });
@@ -85,11 +85,24 @@ export class LangGraphAgentExecutor implements AgentExecutor {
     }
 
 
+    private publishAndLog(eventBus: ExecutionEventBus, payload: unknown, label: string): void {
+        logger.info(`[A2A-PUBLISH] ${label}:`, JSON.stringify(payload, null, 2));
+        eventBus.publish(payload as Parameters<typeof eventBus.publish>[0]);
+    }
+
     async execute(requestContext: RequestContext, eventBus: ExecutionEventBus): Promise<void> {
+        logger.info("[A2A-EXECUTE] requestContext:", JSON.stringify(requestContext, null, 2));
+        logger.info("[A2A-EXECUTE] userMessage.parts:", JSON.stringify(requestContext.userMessage.parts, null, 2));
+        if (requestContext.task) {
+            logger.info("[A2A-EXECUTE] task.status.message:", JSON.stringify(requestContext.task.status?.message, null, 2));
+            logger.info("[A2A-EXECUTE] task.history:", JSON.stringify(requestContext.task.history, null, 2));
+        }
+
         const extensions = this.validateExtensions(requestContext.userMessage.extensions);
-        logger.log(requestContext)
+        logger.info("[A2A-EXECUTE] validated extensions:", extensions);
 
         if(extensions.includes("https://github.com/SAP-samples/btp-joule-a2a-pro-code-agent/a2a-agent/extensions/mock-response/v1")) {
+            logger.info("[A2A-EXECUTE] mock-response extension active — returning mock payload");
             this.mockResponse(eventBus)
             return
         }
@@ -98,22 +111,22 @@ export class LangGraphAgentExecutor implements AgentExecutor {
         const existingTask = requestContext.task;
 
         if(userMessage.parts.find((part) => part.kind !== "text")) {
-            logger.log("Found parts in message content other than kind text, but only text is supported", userMessage.parts);
+            logger.warn("[A2A-EXECUTE] non-text parts found (only text is supported):", JSON.stringify(userMessage.parts, null, 2));
         }
 
         const taskId = existingTask?.id || requestContext.taskId || uuidv4();
         const contextId = userMessage.contextId || existingTask?.contextId || uuidv4();
+        logger.info(`[A2A-EXECUTE] taskId=${taskId} contextId=${contextId} existingTask=${!!existingTask}`);
 
         // 1. Publish initial Task event if it's a new task
         if (!existingTask) {
-            logger.log("Publishing initial task event", taskId);
             const initialTask: Task = createNewTask(userMessage, {taskId, contextId})
-            eventBus.publish(initialTask);
+            this.publishAndLog(eventBus, initialTask, "initial Task event");
         }
 
         // 2. Publish "working" status update
         const workingStatusUpdate: TaskStatusUpdateEvent = createMessageUpdate("Processing your request...", {taskId, contextId, final: false});
-        eventBus.publish(workingStatusUpdate);
+        this.publishAndLog(eventBus, workingStatusUpdate, "working status update");
 
         const historyForAgent = contexts.get(contextId) || [];
 
@@ -121,9 +134,11 @@ export class LangGraphAgentExecutor implements AgentExecutor {
             historyForAgent.push(userMessage);
         }
         contexts.set(contextId, historyForAgent);
+        logger.info(`[A2A-EXECUTE] context history length=${historyForAgent.length} for contextId=${contextId}`);
 
         // Convert A2A messages to LangChain format (via helper)
         const messages = a2aMessagesToLangChain(historyForAgent);
+        logger.info("[A2A-EXECUTE] LangChain messages:", JSON.stringify(messages, null, 2));
 
         let res;
 
@@ -132,12 +147,14 @@ export class LangGraphAgentExecutor implements AgentExecutor {
 
         // If resuming a task
         if (requestContext.task) {
-            logger.log("resuming task", requestContext.taskId)
+            logger.info(`[A2A-EXECUTE] resuming task taskId=${requestContext.taskId}, messageText: ${messageText}`);
+            logger.info("[A2A-EXECUTE] resume Command input (full userMessage):", JSON.stringify(userMessage, null, 2));
             res = await this.app.stream(
                 new Command({ resume: messageText }),
                 { configurable: { thread_id: requestContext.taskId } }
             )
         } else {
+            logger.info(`[A2A-EXECUTE] starting new task taskId=${taskId}`);
             res = await this.app.stream(
                 { messages },
                 {
@@ -147,42 +164,51 @@ export class LangGraphAgentExecutor implements AgentExecutor {
         }
 
         let finalRes = "";
+        let chunkIndex = 0;
         for await (const chunk of res) {
+            logger.info(`[A2A-STREAM] chunk[${chunkIndex}]:`, JSON.stringify(chunk, null, 2));
+            chunkIndex++;
+
             if(!("__interrupt__" in chunk)) {
-                //Concatenating final response
                 const agentMessages = chunk.agent?.messages;
                 if(Array.isArray(agentMessages)) {
                     const agentMessage = agentMessages[agentMessages.length -1];
                     if(agentMessage instanceof Object && "content" in agentMessage) {
+                        logger.info("[A2A-STREAM] accumulating agent content:", agentMessage.content);
                         finalRes += agentMessage.content;
                     }
                 }
                 continue
             }
-            logger.log("publishing interrupt")
+
+            logger.info("[A2A-STREAM] interrupt detected in chunk:", JSON.stringify(chunk, null, 2));
             type InterruptChunk = {
                 __interrupt__: Array<{
-                    value: any;
+                    value: unknown;
                 }>;
             };
             const interruptValue = (chunk as InterruptChunk).__interrupt__[0].value
-            const interruptUpdate: TaskStatusUpdateEvent = createInterruptUpdate(interruptValue, {taskId, contextId});
-            eventBus.publish(interruptUpdate);
+            logger.info("[A2A-STREAM] interrupt value:", JSON.stringify(interruptValue, null, 2));
+            const interruptUpdate: TaskStatusUpdateEvent = createInterruptUpdate(interruptValue as string, {taskId, contextId});
+            this.publishAndLog(eventBus, interruptUpdate, "interrupt status update");
             eventBus.finished();
+            logger.info(`[A2A-EXECUTE] task ${taskId} finished via interrupt`);
             return
         }
 
+        logger.info(`[A2A-EXECUTE] stream ended. finalRes length=${finalRes.length}, content: ${finalRes}`);
+
         const finalMessage: Message = createMessage(finalRes, {taskId, contextId});
+        logger.info("[A2A-EXECUTE] finalMessage:", JSON.stringify(finalMessage, null, 2));
 
         historyForAgent.push(finalMessage);
         contexts.set(contextId, historyForAgent);
 
         const finalUpdate: TaskStatusUpdateEvent = createMessageUpdate(finalMessage, {taskId, contextId, final: true});
+        this.publishAndLog(eventBus, finalUpdate, "final status update (completed)");
 
-        eventBus.publish(finalUpdate);
         eventBus.finished();
-
-        logger.log(`[LangGraphAgentExecutor] Task ${taskId} finished with state: ${"completed"}`);
+        logger.info(`[A2A-EXECUTE] task ${taskId} finished with state: completed`);
     }
 
     public cancelTask = async (taskId: string, eventBus: ExecutionEventBus): Promise<void> => {};
@@ -192,7 +218,7 @@ export class LangGraphAgentExecutor implements AgentExecutor {
         const lastMessage = messages[messages.length - 1] as { tool_calls?: unknown[] } | undefined;
 
         if (lastMessage?.tool_calls?.length) {
-            console.log("Invoking tools!");
+            logger.info("[A2A-GRAPH] routing to tools node, tool_calls:", JSON.stringify(lastMessage.tool_calls, null, 2));
             return "tools";
         }
         
