@@ -15,6 +15,7 @@ import type { BaseMessageLike } from "@langchain/core/messages";
 
 import { a2aMessagesToLangChain } from "./utils/a2aToLangchain";
 import { tools as agentTools } from "./tools/tools";
+import { loadMcpTools } from "./utils/mcp-loader";
 import { getSystemPrompt } from "./utils/prompts";
 import { createInterruptUpdate, createMessage, createMessageUpdate, createNewTask } from "./utils/a2a-operations";
 
@@ -38,8 +39,17 @@ function createAgentNode(modelWithTools: ReturnType<OrchestrationClient["bindToo
 
 export class LangGraphAgentExecutor implements AgentExecutor {
     private app: any;
+    // Resolved in init(); app is unusable until init() resolves
+    private initPromise: Promise<void>;
 
     constructor() {
+        this.initPromise = this.init();
+    }
+
+    private async init(): Promise<void> {
+        const mcpTools = await loadMcpTools();
+        const allTools = [...agentTools, ...mcpTools];
+
         const model = new OrchestrationClient({
             promptTemplating: {
                 model: {
@@ -47,8 +57,8 @@ export class LangGraphAgentExecutor implements AgentExecutor {
                 }
             }
         });
-        const modelWithTools = model.bindTools(agentTools);
-        const toolNode = new ToolNode(agentTools);
+        const modelWithTools = model.bindTools(allTools);
+        const toolNode = new ToolNode(allTools);
         const stateGraph = this.instantiateStateGraph(toolNode, createAgentNode(modelWithTools));
         const memorySaver = new MemorySaver();
         this.app = stateGraph.compile({ checkpointer: memorySaver });
@@ -91,6 +101,7 @@ export class LangGraphAgentExecutor implements AgentExecutor {
     }
 
     async execute(requestContext: RequestContext, eventBus: ExecutionEventBus): Promise<void> {
+        await this.initPromise;
         logger.info("[A2A-EXECUTE] requestContext:", JSON.stringify(requestContext, null, 2));
         logger.info("[A2A-EXECUTE] userMessage.parts:", JSON.stringify(requestContext.userMessage.parts, null, 2));
         if (requestContext.task) {
