@@ -34,6 +34,7 @@ modules:
       - name: generative-ai-hub
       - name: destination-service
       - name: logging-service
+      - name: agent-db
 
 resources:
   - name: generative-ai-hub
@@ -51,3 +52,10 @@ resources:
     parameters:
       service: application-logs
       service-plan: lite
+  - name: agent-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+    properties:
+      hdi-service-name: ${service-name}

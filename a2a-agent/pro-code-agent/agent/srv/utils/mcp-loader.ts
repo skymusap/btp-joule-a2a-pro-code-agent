@@ -7,25 +7,25 @@ const logger = cds.log("pro-code-agent", { label: "MCP Loader" });
 
 /**
  * Claude Code mcpServers format (subset we support):
- *   { "server-name": { "command": "npx", "args": [...], "env": {...} } }          — stdio
- *   { "server-name": { "url": "https://...", "type": "sse"|"http", "headers": {...} } } — HTTP/SSE
+ *   stdio: { command, args?, env? }
+ *   HTTP:  { url, type?: "sse"|"http"|"streamable_http", headers? }
  */
-type ClaudeStdioEntry = {
+export type ClaudeStdioEntry = {
     command: string;
     args?: string[];
     env?: Record<string, string>;
 };
 
-type ClaudeHttpEntry = {
+export type ClaudeHttpEntry = {
     url: string;
     type?: "sse" | "http" | "streamable_http";
     headers?: Record<string, string>;
 };
 
-type ClaudeMcpEntry = ClaudeStdioEntry | ClaudeHttpEntry;
-type ClaudeMcpServers = Record<string, ClaudeMcpEntry>;
+export type ClaudeMcpEntry = ClaudeStdioEntry | ClaudeHttpEntry;
+export type ClaudeMcpServers = Record<string, ClaudeMcpEntry>;
 
-function toAdapterConnection(entry: ClaudeMcpEntry): Connection {
+export function toAdapterConnection(entry: ClaudeMcpEntry): Connection {
     if ("url" in entry) {
         const transport = entry.type === "sse" ? "sse" : "streamable_http";
         return { transport, url: entry.url, headers: entry.headers } as Connection;
@@ -38,33 +38,22 @@ function toAdapterConnection(entry: ClaudeMcpEntry): Connection {
     } as Connection;
 }
 
-export async function loadMcpTools(): Promise<DynamicStructuredTool[]> {
-    const raw = process.env.MCP_SERVER_SETTING;
-    if (!raw) {
-        logger.info("[MCP] MCP_SERVER_SETTING not set — no MCP tools loaded");
-        return [];
-    }
-
-    let parsed: ClaudeMcpServers;
-    try {
-        parsed = JSON.parse(raw);
-    } catch (err) {
-        logger.error("[MCP] Failed to parse MCP_SERVER_SETTING JSON:", err);
-        return [];
-    }
-
-    const serverNames = Object.keys(parsed);
+/**
+ * Connect to the servers described in `config` and return all discovered LangChain tools.
+ * The caller is responsible for merging configs from multiple sources before calling this.
+ */
+export async function loadMcpTools(config: ClaudeMcpServers): Promise<DynamicStructuredTool[]> {
+    const serverNames = Object.keys(config);
     if (serverNames.length === 0) {
-        logger.info("[MCP] MCP_SERVER_SETTING is empty — no MCP tools loaded");
         return [];
     }
 
     const servers: Record<string, Connection> = {};
     for (const name of serverNames) {
-        servers[name] = toAdapterConnection(parsed[name]);
+        servers[name] = toAdapterConnection(config[name]);
     }
 
-    logger.info(`[MCP] Connecting to ${serverNames.length} MCP server(s): ${serverNames.join(", ")}`);
+    logger.info(`[MCP] Connecting to ${serverNames.length} server(s): ${serverNames.join(", ")}`);
 
     const client = new MCPAdapter({ servers });
 
@@ -72,16 +61,16 @@ export async function loadMcpTools(): Promise<DynamicStructuredTool[]> {
     try {
         toolsByServer = await client.listToolsets();
     } catch (err) {
-        logger.error("[MCP] Failed to discover MCP tools:", err);
+        logger.error("[MCP] Failed to discover tools:", err);
         return [];
     }
 
     const allTools: DynamicStructuredTool[] = [];
     for (const [server, tools] of Object.entries(toolsByServer)) {
-        logger.info(`[MCP] Server "${server}" provided ${tools.length} tool(s): ${tools.map((t) => t.name).join(", ")}`);
+        logger.info(`[MCP] "${server}" → ${tools.length} tool(s): ${tools.map((t) => t.name).join(", ")}`);
         allTools.push(...tools);
     }
 
-    logger.info(`[MCP] Total MCP tools loaded: ${allTools.length}`);
+    logger.info(`[MCP] Total tools loaded: ${allTools.length}`);
     return allTools;
 }

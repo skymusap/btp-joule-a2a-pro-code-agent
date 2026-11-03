@@ -1,0 +1,15 @@
+{
+    "_comment": "Developer-local additional MCP servers. This file is loaded at source 3 priority (below DB and env var). Add entries in Claude Code mcpServers format.",
+    "_example": {
+        "my-local-server": {
+            "command": "npx",
+            "args": ["-y", "some-mcp-server"],
+            "env": {}
+        },
+        "my-remote-server": {
+            "url": "https://my-mcp-server.example.com",
+            "type": "streamable_http",
+            "headers": {}
+        }
+    }
+}

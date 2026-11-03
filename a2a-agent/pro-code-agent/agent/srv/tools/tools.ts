@@ -18,6 +18,7 @@ import {
 } from "../utils/types";
 import { interrupt } from "@langchain/langgraph";
 import { loadMcpTools } from "../utils/mcp-loader";
+import { loadMcpSettings } from "../utils/mcp-settings";
 
 const logger = cds.log("pro-code-agent", { label: "Tools" });
 
@@ -140,7 +141,8 @@ export async function loadTools(): Promise<StructuredToolInterface[]> {
     }
 
     logger.info("[Tools] USE_MCP_SERVER=true — loading S/4HANA sales tools from MCP server");
-    const mcpTools = await loadMcpTools();
+    const mcpSettings = await loadMcpSettings();
+    const mcpTools = await loadMcpTools(mcpSettings);
 
     if (mcpTools.length === 0) {
         logger.warn("[Tools] MCP server returned no tools — falling back to static mock sales tools");
