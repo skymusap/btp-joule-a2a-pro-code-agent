@@ -1,5 +1,5 @@
 _schema-version: 3.3.0
-ID: astemo-poc-code-based-agent
+ID: csd-a2a-demo-code-based-agent
 version: 1.0.0
 description: "Custom code based a2a agent"
 parameters:
@@ -12,7 +12,7 @@ build-parameters:
         # don't want to run it on every single build
         - npx cds build --production
 modules:
-  - name: astemo-poc-code-based-agent-srv
+  - name: csd-a2a-demo-code-based-agent-srv
     type: nodejs
     path: gen/srv
     parameters:
