@@ -9,6 +9,7 @@
         "@a2a-js/sdk": "0.3.10",
         "@langchain/core": "^1.1.32",
         "@langchain/langgraph": "^1.2.2",
+        "@langchain/mcp-adapters": "^2.0.1",
         "@sap-ai-sdk/langchain": "^2.8.0",
         "@sap-ai-sdk/orchestration": "^2.8.0",
         "@sap-ai-sdk/rpt": "^2.9.0",

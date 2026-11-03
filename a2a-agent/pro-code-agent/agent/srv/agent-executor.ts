@@ -14,8 +14,7 @@ import { ToolNode } from "@langchain/langgraph/prebuilt";
 import type { BaseMessageLike } from "@langchain/core/messages";
 
 import { a2aMessagesToLangChain } from "./utils/a2aToLangchain";
-import { tools as agentTools } from "./tools/tools";
-import { loadMcpTools } from "./utils/mcp-loader";
+import { loadTools } from "./tools/tools";
 import { getSystemPrompt } from "./utils/prompts";
 import { createInterruptUpdate, createMessage, createMessageUpdate, createNewTask } from "./utils/a2a-operations";
 
@@ -47,8 +46,7 @@ export class LangGraphAgentExecutor implements AgentExecutor {
     }
 
     private async init(): Promise<void> {
-        const mcpTools = await loadMcpTools();
-        const allTools = [...agentTools, ...mcpTools];
+        const allTools = await loadTools();
 
         const model = new OrchestrationClient({
             promptTemplating: {

@@ -1,4 +1,6 @@
+import cds from "@sap/cds";
 import { tool } from "@langchain/core/tools";
+import type { StructuredToolInterface } from "@langchain/core/tools";
 import {
     fetchDiscounts,
     fetchPaymentTerms,
@@ -15,36 +17,16 @@ import {
     ScoringSalesQuotationOptions
 } from "../utils/types";
 import { interrupt } from "@langchain/langgraph";
+import { loadMcpTools } from "../utils/mcp-loader";
 
-const getPaymentTerms = tool(
-    async () => {
-        console.log("getPaymentTerms tool called!");
-        const paymentTerms = await fetchPaymentTerms();
-        return paymentTerms;
-    },
-    {
-        name: "get_payment_terms",
-        description: "Get the available payment terms from the system.",
-        schema: PaymentTerms
-    }
-);
+const logger = cds.log("pro-code-agent", { label: "Tools" });
 
-const getPossibleDiscounts = tool(
-    async () => {
-        console.log("getPossibleDiscounts tool called!");
-        const discounts = await fetchDiscounts();
-        return discounts;
-    },
-    {
-        name: "get_possible_discounts",
-        description: "Get the possible discount rates and their descriptions.",
-        schema: PossibleDiscounts
-    }
-);
+// ---------------------------------------------------------------------------
+// Tools that are always present regardless of mode
+// ---------------------------------------------------------------------------
 
 const getAllCombinations = tool(
     async (input: any) => {
-        console.log("getAllCombinations tool called!");
         const { paymentTerms, discounts }: { paymentTerms: string[]; discounts: string[] } = input;
         const combinations = [];
         for (const term of paymentTerms) {
@@ -58,19 +40,6 @@ const getAllCombinations = tool(
         name: "get_all_combinations",
         description: "Get all combinations of payment terms and discounts.",
         schema: GetAllCombinations
-    }
-);
-
-const createSalesQuotation = tool(
-    async () => {
-        console.log("createSalesQuotation tool called!");
-        const createdSalesQuotation = await invokeSalesQuotationCreation();
-        return createdSalesQuotation;
-    },
-    {
-        name: "create_sales_quotation",
-        description: "Create a sales quotation in the system.",
-        schema: SalesQuotation
     }
 );
 
@@ -90,7 +59,6 @@ const askExpert = tool(
 
 const predictSalesQuotationScoresTool = tool(
     async (input: any) => {
-        console.log("predictSalesQuotationScores tool called !");
         const { customerName, salesInquiryID, paymentTermsAndDiscountsCombinations, taskType } = input;
 
         const options = paymentTermsAndDiscountsCombinations.map((combo: any) => ({
@@ -110,11 +78,74 @@ const predictSalesQuotationScoresTool = tool(
         schema: ScoringSalesQuotationOptions
     }
 );
-export const tools = [
-    askExpert,
-    getPaymentTerms,
-    getPossibleDiscounts,
-    createSalesQuotation,
-    getAllCombinations,
-    predictSalesQuotationScoresTool
+
+// ---------------------------------------------------------------------------
+// Static mock sales tools (default mode)
+// ---------------------------------------------------------------------------
+
+const staticGetPaymentTerms = tool(
+    async () => {
+        const paymentTerms = await fetchPaymentTerms();
+        return paymentTerms;
+    },
+    {
+        name: "get_payment_terms",
+        description: "Get the available payment terms from the system.",
+        schema: PaymentTerms
+    }
+);
+
+const staticGetPossibleDiscounts = tool(
+    async () => {
+        const discounts = await fetchDiscounts();
+        return discounts;
+    },
+    {
+        name: "get_possible_discounts",
+        description: "Get the possible discount rates and their descriptions.",
+        schema: PossibleDiscounts
+    }
+);
+
+const staticCreateSalesQuotation = tool(
+    async () => {
+        const createdSalesQuotation = await invokeSalesQuotationCreation();
+        return createdSalesQuotation;
+    },
+    {
+        name: "create_sales_quotation",
+        description: "Create a sales quotation in the system.",
+        schema: SalesQuotation
+    }
+);
+
+const staticSalesTools: StructuredToolInterface[] = [
+    staticGetPaymentTerms,
+    staticGetPossibleDiscounts,
+    staticCreateSalesQuotation
 ];
+
+// ---------------------------------------------------------------------------
+// Tool loader — switches between static mock and MCP-backed S/4HANA tools
+// ---------------------------------------------------------------------------
+
+export async function loadTools(): Promise<StructuredToolInterface[]> {
+    const alwaysOnTools: StructuredToolInterface[] = [askExpert, getAllCombinations, predictSalesQuotationScoresTool];
+
+    const useMcp = (process.env.USE_MCP_SERVER ?? "").toLowerCase() === "true";
+
+    if (!useMcp) {
+        logger.info("[Tools] USE_MCP_SERVER not set — using static mock sales tools");
+        return [...alwaysOnTools, ...staticSalesTools];
+    }
+
+    logger.info("[Tools] USE_MCP_SERVER=true — loading S/4HANA sales tools from MCP server");
+    const mcpTools = await loadMcpTools();
+
+    if (mcpTools.length === 0) {
+        logger.warn("[Tools] MCP server returned no tools — falling back to static mock sales tools");
+        return [...alwaysOnTools, ...staticSalesTools];
+    }
+
+    return [...alwaysOnTools, ...mcpTools];
+}
