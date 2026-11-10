@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from "uuid";
 import { MessageSendParams, Message, Task, TaskArtifactUpdateEvent, TaskStatusUpdateEvent } from "@a2a-js/sdk";
 import {
   DefaultRequestHandler,
@@ -8,13 +9,18 @@ class CustomRequestHandler extends DefaultRequestHandler {
 
     public async sendMessage(params: MessageSendParams): Promise<Message | Task> {
         validatePushNotificationURL(params.configuration?.pushNotificationConfig?.url)
-        return super.sendMessage(params);
+        return super.sendMessage(ensureMessageId(params));
     }
 
     public sendMessageStream(params: MessageSendParams): AsyncGenerator<Message | Task | TaskStatusUpdateEvent | TaskArtifactUpdateEvent, void, undefined> {
         validatePushNotificationURL(params.configuration?.pushNotificationConfig?.url)
-        return super.sendMessageStream(params);
+        return super.sendMessageStream(ensureMessageId(params));
     }
+}
+
+function ensureMessageId(params: MessageSendParams): MessageSendParams {
+    if (params.message.messageId) return params;
+    return { ...params, message: { ...params.message, messageId: uuidv4() } };
 }
 
 function isHostAllowed(host: string, pattern: string): boolean {
