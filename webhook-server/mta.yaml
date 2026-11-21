@@ -1,5 +1,5 @@
 _schema-version: "3.2"
-ID: astemo-poc-webhook-cap
+ID: csd-webhook-cap
 version: 1.0.0
 description: "CAP webhook + SSE with React UI and Approuter on SAP BTP"
 parameters:
@@ -21,7 +21,7 @@ build-parameters:
 
 modules:
   # --------------------- APPROUTER MODULE ---------------------
-  - name: astemo-poc-webhook-cap-router
+  - name: csd-webhook-cap-router
     type: approuter.nodejs
     path: ./router
     build-parameters:
@@ -31,13 +31,13 @@ modules:
         - "node_modules/"
         - "manifest*.yml"
     parameters:
-      app-name: astemo-poc-webhook-cap-router
+      app-name: csd-webhook-cap-router
       disk-quota: 256MB
       memory: 256MB
       keep-existing-routes: true
     requires:
-      - name: astemo-poc-webhook-cap-uaa
-      - name: astemo-poc-webhook-cap-srv-api
+      - name: csd-webhook-cap-uaa
+      - name: csd-webhook-cap-srv-api
         group: destinations
         properties:
           name: srv-api
@@ -46,12 +46,12 @@ modules:
           url: ~{srv-url}
           timeout: 600000
     provides:
-      - name: astemo-poc-webhook-cap-approuter
+      - name: csd-webhook-cap-approuter
         properties:
           app-url: ${default-url}
 
   # --------------------- CAP SRV MODULE ------------------------
-  - name: astemo-poc-webhook-cap-srv
+  - name: csd-webhook-cap-srv
     type: nodejs
     path: ./api
     build-parameters:
@@ -60,27 +60,27 @@ modules:
         - "manifest*.yml"
         - "node_modules/"
     parameters:
-      app-name: astemo-poc-webhook-cap-srv
+      app-name: csd-webhook-cap-srv
       memory: 512MB
       disk-quota: 512MB
       command: node server.js
     requires:
-      - name: astemo-poc-webhook-cap-uaa
+      - name: csd-webhook-cap-uaa
     provides:
-      - name: astemo-poc-webhook-cap-srv-api
+      - name: csd-webhook-cap-srv-api
         properties:
           srv-url: ${default-url}
 
 resources:
   # ----------------------- XSUAA SERVICE ------------------------
-  - name: astemo-poc-webhook-cap-uaa
+  - name: csd-webhook-cap-uaa
     type: org.cloudfoundry.managed-service
     parameters:
       service: xsuaa
       service-plan: application
       path: ./api/xs-security.json
       config:
-        xsappname: astemo-poc-webhook-cap-server
+        xsappname: csd-webhook-cap-server
         tenant-mode: dedicated
 
   # ----------------- DESTINATION SERVICE ----------------------

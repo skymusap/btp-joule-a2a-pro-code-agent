@@ -1,5 +1,5 @@
 {
-    "name": "astemo-poc-webhook-cap-router",
+    "name": "csd-webhook-cap-router",
     "private": true,
     "description": "SAP Approuter for CAP + React SSE app",
     "dependencies": {

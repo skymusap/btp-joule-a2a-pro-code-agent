@@ -1,5 +1,5 @@
 {
-  "name": "astemo-poc-webhook-cap-server",
+  "name": "csd-webhook-cap-server",
   "version": "1.0.0",
   "private": true,
   "description": "CAP TypeScript server exposing a /webhook endpoint",

@@ -1,5 +1,5 @@
 {
-    "name": "astemo-poc-webhook-cap-workspace",
+    "name": "csd-webhook-cap-workspace",
     "version": "1.0.0",
     "description": "Workspace scripts to run CAP API and React UI together",
     "license": "ISC",

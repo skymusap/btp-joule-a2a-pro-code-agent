@@ -39,7 +39,7 @@ function createMessageUpdate(message: string | Message, options: {taskId: string
                 message: statusMessage,
                 timestamp: new Date().toISOString()
             },
-            final: false
+            final: final
         }
     );
 }

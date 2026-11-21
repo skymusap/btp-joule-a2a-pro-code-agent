@@ -1,3 +1,18 @@
+import { RptClient } from "@sap-ai-sdk/rpt";
+
+type DataSchema = NonNullable<Parameters<RptClient["predictWithSchema"]>[0]>;
+
+const createRptClient = (): RptClient => {
+    const deploymentId = process.env.RPT_DEPLOYMENT_ID?.trim();
+    const resourceGroup = process.env.RPT_RESOURCE_GROUP?.trim() || "default";
+
+    return new RptClient(
+        deploymentId
+            ? { deploymentId, resourceGroup }
+            : { modelName: process.env.RPT_MODEL_NAME?.trim() || "sap-rpt-1.6", resourceGroup }
+    );
+};
+
 const getExecutionTime = () => 100 + Math.floor(Math.random() * 300);
 
 const fetchPaymentTerms = async (): Promise<{ [key: string]: string }> => {
@@ -139,7 +154,7 @@ const salesData = () => [
 ];
 
 // Types
-interface SalesDataType {
+type SalesDataType = {
     __row_idx__: string;
     customerName: string;
     salesInquiryID: string;
@@ -151,7 +166,7 @@ interface SalesDataType {
     product: string;
     currency: string;
     amount: string;
-}
+};
 
 interface TargetColumn {
     name: string;
@@ -179,10 +194,10 @@ const RPT_CALL_REGRESSION = async (
     index_column: string,
     rows: SalesDataType[]
 ): Promise<string> => {
-    const { RptClient } = require("@sap-ai-sdk/rpt");
-    const rptClient = new RptClient();
+    const rptClient = createRptClient();
 
-    const schema = [
+    // Use the general schema type because numeric targets contain string prediction placeholders.
+    const schema: DataSchema = [
         { name: "__row_idx__", dtype: "string" },
         { name: "customerName", dtype: "string" },
         { name: "salesInquiryID", dtype: "string" },
@@ -194,7 +209,7 @@ const RPT_CALL_REGRESSION = async (
         { name: "product", dtype: "string" },
         { name: "currency", dtype: "string" },
         { name: "amount", dtype: "string" }
-    ] as const;
+    ];
 
     const historicalData = salesData();
 
@@ -218,10 +233,10 @@ const RPT_CALL_CLASSIFICATION = async (
     index_column: string,
     rows: SalesDataType[]
 ): Promise<string> => {
-    const { RptClient } = require("@sap-ai-sdk/rpt");
-    const rptClient = new RptClient();
+    const rptClient = createRptClient();
 
-    const schema = [
+    // Use the general schema type because numeric targets contain string prediction placeholders.
+    const schema: DataSchema = [
         { name: "__row_idx__", dtype: "string" },
         { name: "customerName", dtype: "string" },
         { name: "salesInquiryID", dtype: "string" },
@@ -233,7 +248,7 @@ const RPT_CALL_CLASSIFICATION = async (
         { name: "product", dtype: "string" },
         { name: "currency", dtype: "string" },
         { name: "amount", dtype: "string" }
-    ] as const;
+    ];
 
     const historicalData = salesData();
 
